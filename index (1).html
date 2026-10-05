@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presyo Costing</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: ingredient prices to check on the left, the final selling price on a sticky receipt on the right. */
+:root{
+  --font-display:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --bg:#F5F5F7; --paper:#FFFFFF; --ink:#1D1D1F; --muted:#6E6E73; --line:#E2E2E6; --field:#FFFFFF;
+  --accent:#2F5BEA; --on-accent:#FFFFFF; --warn:#B26A00; --bad:#C62D2D;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121214; --paper:#1C1C1F; --ink:#F2F2F4; --muted:#9A9AA2; --line:#2D2D32; --field:#151517;
+    --accent:#7C9BFF; --on-accent:#0B1020; --warn:#E0A44A; --bad:#F27B7B;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121214; --paper:#1C1C1F; --ink:#F2F2F4; --muted:#9A9AA2; --line:#2D2D32; --field:#151517;
+  --accent:#7C9BFF; --on-accent:#0B1020; --warn:#E0A44A; --bad:#F27B7B;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font-body);padding-inline:16px;padding-block:28px 40px}
+.wrap{max-width:1040px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between;padding-bottom:20px}
+header h1{font:700 40px/1 var(--font-display);letter-spacing:-.02em;margin:0}
+header p{margin:8px 0 0;color:var(--muted);max-width:52ch}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:36px;align-items:start}
+.inputs,.result{min-width:0}
+.blk{padding-block:24px;border-top:1px solid var(--line)}
+.lbl{font:600 12px/1.2 var(--font-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+.hint{color:var(--muted);font-size:12.5px;margin:0 0 12px;max-width:62ch}
+.row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f>span{font-size:11.5px;color:var(--muted);font-weight:500}
+input,select{width:100%;min-width:0;min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:4px;background:var(--field);color:var(--ink);font:inherit}
+input[type=number]{font-family:var(--font-mono);text-align:right}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{min-height:36px;padding:6px 14px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--ink);font:500 13px var(--font-body);cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{color:var(--on-accent);filter:brightness(1.08)}
+.x{min-height:38px;width:38px;padding:0;border:1px solid transparent;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;border-radius:4px}
+.x:hover{color:var(--bad);border-color:var(--line)}
+
+/* ingredient rows */
+.ing-head,.ing{display:grid;gap:8px;align-items:end;grid-template-columns:minmax(0,2fr) 78px 76px 88px 76px 90px 66px 38px}
+.ing-head{font-size:11.5px;color:var(--muted);font-weight:500;padding-bottom:4px}
+.ing-head span:nth-child(2),.ing-head span:nth-child(4),.ing-head span:nth-child(6){text-align:right}
+.ing{padding-block:3px}
+.ing .f>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.ing select{padding-inline:6px}
+.cost{font:500 13px var(--font-mono);text-align:right;padding-bottom:9px}
+.cost.bad{color:var(--bad);font-size:11.5px}
+.ing.mismatch input[data-k=q],.ing.mismatch select{border-color:var(--bad)}
+.chk{display:flex;align-items:center;gap:6px;min-height:38px;cursor:pointer;font-size:12.5px;justify-content:center}
+.chk input{width:18px;min-height:18px;height:18px;accent-color:var(--accent)}
+.src{display:block;font-size:10.5px;color:var(--muted);letter-spacing:.03em;margin-top:2px}
+.src.da{color:var(--accent)}
+.rowtools{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center}
+.progress{margin-left:auto;font-size:12.5px;color:var(--muted)}
+details.prices{margin-top:14px;border:1px solid var(--line);border-radius:4px;background:var(--paper)}
+details.prices>summary{cursor:pointer;padding:10px 12px;font-weight:600;list-style-position:inside}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0 20px;padding:4px 12px 12px}
+.pitem{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);min-width:0}
+.pitem b{font-weight:500;flex:1;min-width:0}
+.pitem code{font:12.5px var(--font-mono);color:var(--muted);white-space:nowrap}
+.tag{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:1px 5px;border:1px solid var(--line);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.da{color:var(--accent);border-color:var(--accent)}
+.pitem button{min-height:28px;padding:2px 9px;font-size:12px}
+
+/* resibo */
+.result{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);align-self:start}
+.receipt{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:24px 22px;font:14px/1.45 var(--font-body)}
+.receipt h2{font:600 11.5px var(--font-body);letter-spacing:.09em;text-transform:uppercase;margin:0;color:var(--muted);text-align:center}
+.receipt .prod{font:700 22px/1.15 var(--font-display);text-align:center;margin:10px 0 2px;text-wrap:balance;overflow-wrap:anywhere}
+.big{text-align:center;margin:16px 0 4px;font:700 52px/1 var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bigl{text-align:center;color:var(--muted);font-size:12px}
+.rule{border:0;border-top:1px solid var(--line);margin:16px 0}
+.ln{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:3px;font-variant-numeric:tabular-nums}
+.ln i{display:none}
+.ln b{font:500 13px var(--font-mono);white-space:nowrap}
+.ln.sum{font-weight:600;margin-top:2px}
+.ln.sum b{font-weight:700}
+.ln.neg b{color:var(--bad)}
+.warns{margin:14px 0 0;padding:0;list-style:none;font:12.5px/1.4 var(--font-body);color:var(--bad);display:grid;gap:4px}
+.override{margin-top:14px}
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .result{position:static}
+}
+@media (max-width:720px){
+  header h1{font-size:32px}
+  .ing-head{display:none}
+  .ing{grid-template-columns:repeat(6,minmax(0,1fr));row-gap:6px}
+  .ing .f>span{position:static;width:auto;height:auto;clip-path:none;overflow:visible}
+  .ing .f.n{grid-column:span 6}.ing .f.q{grid-column:span 3}.ing .f.u{grid-column:span 3}
+  .ing .f.p{grid-column:span 3}.ing .f.pu{grid-column:span 3}
+  .ing .cost{grid-column:span 3;padding-bottom:0;align-self:center;text-align:left}
+  .ing .chk{grid-column:span 2;justify-content:flex-start}
+  .ing .x{grid-column:span 1;justify-self:end}
+}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Presyo</h1>
+      <p>Check your ingredient prices, get your selling price.</p>
+    </div>
+    <button class="btn" id="reset" type="button">Reset all</button>
+  </header>
+
+  <div class="layout">
+    <div class="inputs">
+      <section class="blk">
+        <h2 class="lbl">Product</h2>
+        <div class="row">
+          <label class="f" for="s-name"><span>Product name</span><input id="s-name" data-s="name" type="text" maxlength="60"></label>
+          <label class="f" for="s-yield"><span>Servings per batch</span><input id="s-yield" data-s="yield" type="number" inputmode="decimal" min="1" step="any"></label>
+          <label class="f" for="s-other"><span>Other cost per serving ₱</span><input id="s-other" data-s="other" type="number" inputmode="decimal" min="0" step="any"></label>
+          <label class="f" for="s-margin"><span>Profit margin wanted %</span><input id="s-margin" data-s="margin" type="number" inputmode="decimal" min="0" max="95" step="any"></label>
+        </div>
+      </section>
+
+      <section class="blk">
+        <h2 class="lbl">Ingredients for one batch</h2>
+        <p class="hint">Compare each price with your palengke, fix it if needed, then tick Checked.</p>
+        <div class="ing-head" aria-hidden="true"><span>Ingredient</span><span>Qty used</span><span>Unit</span><span>Price ₱</span><span>Per</span><span>Cost ₱</span><span>Checked</span><span></span></div>
+        <div id="ings"></div>
+        <div class="rowtools">
+          <button class="btn primary" id="add-ing" type="button">+ Add ingredient</button>
+          <span class="progress" id="progress"></span>
+        </div>
+        <details class="prices">
+          <summary>Palengke price list (tap to add)</summary>
+          <div class="plist" id="plist"></div>
+        </details>
+        <datalist id="presets"></datalist>
+      </section>
+    </div>
+
+    <aside class="result" id="result" aria-live="polite">
+      <div class="receipt">
+        <h2>Per serving</h2>
+        <div class="prod" id="r-name"></div>
+        <div class="big" id="r-price">₱0</div>
+        <div class="bigl" id="r-pricel">Final selling price</div>
+        <hr class="rule">
+        <div id="r-lines"></div>
+        <label class="f override" for="override"><span>Use my own price ₱</span><input id="override" data-s="override" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 149"></label>
+        <ul class="warns" id="warns"></ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){
+  var KEY='presyo-v2';
+  var U={g:[1,'wt'],kg:[1000,'wt'],ml:[1,'vol'],L:[1000,'vol'],tsp:[5,'vol'],tbsp:[15,'vol'],cup:[240,'vol'],pc:[1,'ct'],dozen:[12,'ct']};
+  var UK=Object.keys(U);
+  var PRESETS=[
+    {n:'Rice, well-milled',p:55,u:'kg',t:'da'},
+    {n:'Pork liempo',p:370,u:'kg',t:'da'},
+    {n:'Pork kasim',p:330,u:'kg',t:'da'},
+    {n:'Whole chicken',p:220,u:'kg',t:'da'},
+    {n:'Egg, medium',p:9,u:'pc',t:'da'},
+    {n:'Egg, large',p:10,u:'pc',t:'da'},
+    {n:'Red onion',p:150,u:'kg',t:'da'},
+    {n:'White onion',p:120,u:'kg',t:'da'},
+    {n:'Garlic (imported)',p:140,u:'kg',t:'da'},
+    {n:'Tomato',p:60,u:'kg',t:'da'},
+    {n:'Calamansi',p:110,u:'kg',t:'da'},
+    {n:'Chicken breast fillet',p:250,u:'kg',t:'est'},
+    {n:'Tilapia',p:160,u:'kg',t:'est'},
+    {n:'Cooking oil',p:110,u:'L',t:'est'},
+    {n:'Soy sauce',p:45,u:'L',t:'est'},
+    {n:'Vinegar',p:35,u:'L',t:'est'},
+    {n:'Sugar, refined',p:85,u:'kg',t:'est'},
+    {n:'Salt',p:30,u:'kg',t:'est'},
+    {n:'All-purpose flour',p:60,u:'kg',t:'est'},
+    {n:'Butter',p:580,u:'kg',t:'est'},
+    {n:'Fresh milk',p:105,u:'L',t:'est'},
+    {n:'Carrots',p:90,u:'kg',t:'est'},
+    {n:'Potato',p:100,u:'kg',t:'est'},
+    {n:'Cabbage',p:70,u:'kg',t:'est'},
+    {n:'Pechay',p:80,u:'kg',t:'est'},
+    {n:'Ginger',p:120,u:'kg',t:'est'}
+  ];
+  var uid=1;
+  function nid(){return uid++;}
+  function presetTag(name){
+    var m=PRESETS.filter(function(p){return p.n.toLowerCase()===String(name).trim().toLowerCase();})[0];
+    return m?m.t:'';
+  }
+  function ing(n,q,u,p,pu){return {id:nid(),n:n,q:q,u:u,p:p,pu:pu,ok:false,t:presetTag(n)};}
+  function sample(){
+    return {
+      name:'Chicken Adobo with Rice',yield:10,other:39,margin:40,override:'',
+      ing:[
+        ing('Whole chicken',1.5,'kg',220,'kg'),
+        ing('Rice, well-milled',1.5,'kg',55,'kg'),
+        ing('Soy sauce',150,'ml',45,'L'),
+        ing('Vinegar',100,'ml',35,'L'),
+        ing('Garlic (imported)',40,'g',140,'kg'),
+        ing('Red onion',100,'g',150,'kg'),
+        ing('Cooking oil',60,'ml',110,'L'),
+        ing('Sugar, refined',20,'g',85,'kg'),
+        ing('Egg, medium',10,'pc',9,'pc')
+      ]
+    };
+  }
+  function blank(){
+    return {name:'',yield:'',other:'',margin:'',override:'',ing:[ing('','','g','','kg')]};
+  }
+  var state=load()||sample();
+
+  function load(){
+    try{
+      var raw=localStorage.getItem(KEY);
+      if(!raw) return null;
+      var s=JSON.parse(raw);
+      if(!s||!Array.isArray(s.ing)) return null;
+      s.ing.forEach(function(r){r.id=nid();if(!U[r.u])r.u='g';if(!U[r.pu])r.pu='kg';});
+      return s;
+    }catch(e){return null;}
+  }
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function num(v){var x=parseFloat(v);return isFinite(x)&&x>0?x:0;}
+  function php(n,d){
+    if(!isFinite(n)) return '—';
+    var a=Math.abs(n);
+    return (n<0?'-':'')+'₱'+a.toLocaleString('en-PH',{minimumFractionDigits:d==null?2:d,maximumFractionDigits:d==null?2:d});
+  }
+  function pct(n){return isFinite(n)?(n*100).toFixed(1).replace(/\.0$/,'')+'%':'—';}
+  function $(id){return document.getElementById(id);}
+  function unitOpts(sel){return UK.map(function(k){return '<option'+(k===sel?' selected':'')+'>'+k+'</option>';}).join('');}
+
+  function rowCost(r){
+    var a=U[r.u],b=U[r.pu];
+    if(!a||!b||a[1]!==b[1]) return null;
+    return num(r.q)*a[0]/b[0]*num(r.p);
+  }
+
+  function srcHtml(t){
+    return t==='est'?'<span class="src">Estimate, please verify</span>':'';
+  }
+  function buildIngs(){
+    $('ings').innerHTML=state.ing.map(function(r){
+      var i=r.id;
+      return '<div class="ing" data-id="'+i+'">'+
+        '<label class="f n" for="n'+i+'"><span>Ingredient</span><input id="n'+i+'" data-k="n" list="presets" type="text" value="'+esc(r.n)+'" placeholder="Ingredient" autocomplete="off"><span class="srcwrap" id="s'+i+'" style="position:static;width:auto;height:auto;clip-path:none;overflow:visible">'+srcHtml(r.t)+'</span></label>'+
+        '<label class="f q" for="q'+i+'"><span>Qty used</span><input id="q'+i+'" data-k="q" type="number" inputmode="decimal" min="0" step="any" value="'+esc(r.q)+'"></label>'+
+        '<label class="f u" for="u'+i+'"><span>Unit</span><select id="u'+i+'" data-k="u">'+unitOpts(r.u)+'</select></label>'+
+        '<label class="f p" for="p'+i+'"><span>Price ₱</span><input id="p'+i+'" data-k="p" type="number" inputmode="decimal" min="0" step="any" value="'+esc(r.p)+'"></label>'+
+        '<label class="f pu" for="pu'+i+'"><span>Per</span><select id="pu'+i+'" data-k="pu">'+unitOpts(r.pu)+'</select></label>'+
+        '<output class="cost" id="c'+i+'">—</output>'+
+        '<label class="chk" for="k'+i+'"><input id="k'+i+'" data-k="ok" type="checkbox"'+(r.ok?' checked':'')+'> Checked</label>'+
+        '<button class="x" type="button" data-del="'+i+'" aria-label="Remove ingredient">×</button>'+
+      '</div>';
+    }).join('');
+  }
+  function buildStatic(){
+    $('presets').innerHTML=PRESETS.map(function(p){return '<option value="'+esc(p.n)+'"></option>';}).join('');
+    $('plist').innerHTML=PRESETS.map(function(p,i){
+      return '<div class="pitem"><b>'+esc(p.n)+'</b><span class="tag '+p.t+'">'+(p.t==='da'?'DA/PSA':'est.')+'</span><code>'+php(p.p,0)+'/'+p.u+'</code><button class="btn" type="button" data-add="'+i+'" aria-label="Add '+esc(p.n)+'">Add</button></div>';
+    }).join('');
+    document.querySelectorAll('[data-s]').forEach(function(el){
+      el.value=state[el.dataset.s]==null?'':state[el.dataset.s];
+    });
+  }
+
+  function compute(){
+    var c={bad:[],rows:{},ingTotal:0};
+    c.yield=num(state.yield);
+    state.ing.forEach(function(r){
+      var v=rowCost(r);
+      c.rows[r.id]=v;
+      if(v===null) c.bad.push(r.n||'Unnamed ingredient'); else c.ingTotal+=v;
+    });
+    c.ing=c.ingTotal/(c.yield||1);
+    c.other=num(state.other);
+    c.full=c.ing+c.other;
+    var m=Math.min(num(state.margin),95)/100;
+    c.okM=1-m>0.02;
+    c.suggested=c.okM?c.full/(1-m):NaN;
+    c.rounded=c.okM?Math.ceil(c.suggested/5-1e-9)*5:NaN;
+    c.custom=num(state.override)>0;
+    c.price=c.custom?num(state.override):c.rounded;
+    c.profit=c.price-c.full;
+    c.margin=c.price>0?c.profit/c.price:NaN;
+    c.checked=state.ing.filter(function(r){return r.ok;}).length;
+    return c;
+  }
+  function ln(label,val,cls){return '<div class="ln '+(cls||'')+'"><span>'+label+'</span><i></i><b>'+val+'</b></div>';}
+
+  function update(){
+    var c=compute();
+    state.ing.forEach(function(r){
+      var o=$('c'+r.id); if(!o) return;
+      var v=c.rows[r.id];
+      o.textContent=v===null?'unit mismatch':php(v);
+      o.classList.toggle('bad',v===null);
+      o.closest('.ing').classList.toggle('mismatch',v===null);
+    });
+    $('progress').textContent=c.checked+' of '+state.ing.length+' prices checked';
+    $('r-name').textContent=state.name||'Untitled product';
+    $('r-pricel').textContent=c.custom?'Your selling price':'Selling price';
+    $('r-price').textContent=isFinite(c.price)?php(c.price,Number.isInteger(c.price)?0:2):'—';
+    $('r-lines').innerHTML=
+      ln('Ingredients',php(c.ing))+
+      ln('Other costs',php(c.other))+
+      ln('Full cost',php(c.full),'sum')+
+      ln('Profit per serving',isFinite(c.profit)?php(c.profit):'—','sum'+(c.profit<0?' neg':''))+
+      ln('Profit margin',pct(c.margin),c.profit<0?'neg':'');
+    var w=[];
+    if(c.bad.length) w.push('Unit mismatch, left out of the total: '+c.bad.map(esc).join(', ')+'. Use a price unit of the same kind (weight, volume or count) as the quantity.');
+    if(!c.yield) w.push('Enter how many servings one batch makes.');
+    if(!c.okM) w.push('Margin is too close to 100%, so no price can cover your cost.');
+    if(isFinite(c.price)&&c.price>0&&c.price<c.full) w.push('Your selling price is below your full cost, so every sale loses money.');
+    if(c.checked<state.ing.length) w.push('');
+    w=w.filter(Boolean);
+    $('warns').innerHTML=w.map(function(t){return '<li>'+t+'</li>';}).join('');
+    save();
+  }
+
+  document.querySelectorAll('[data-s]').forEach(function(el){
+    var h=function(){state[el.dataset.s]=el.value;update();};
+    el.addEventListener('input',h);el.addEventListener('change',h);
+  });
+  function findRow(el){var r=el.closest('[data-id]');if(!r)return null;var id=+r.dataset.id;return state.ing.filter(function(x){return x.id===id;})[0]||null;}
+  $('ings').addEventListener('input',function(e){
+    var k=e.target.dataset.k;if(!k)return;
+    var r=findRow(e.target);if(!r)return;
+    r[k]=k==='ok'?e.target.checked:e.target.value;
+    update();
+  });
+  $('ings').addEventListener('change',function(e){
+    if(e.target.dataset.k!=='n')return;
+    var r=findRow(e.target);if(!r)return;
+    var name=e.target.value.trim().toLowerCase();
+    var m=PRESETS.filter(function(p){return p.n.toLowerCase()===name;})[0];
+    if(m){
+      r.p=m.p;r.pu=m.u;r.t=m.t;r.ok=false;
+      var row=e.target.closest('.ing');
+      row.querySelector('[data-k=p]').value=m.p;
+      row.querySelector('[data-k=pu]').value=m.u;
+      row.querySelector('[data-k=ok]').checked=false;
+      $('s'+r.id).innerHTML=srcHtml(m.t);
+      update();
+    }
+  });
+  $('ings').addEventListener('click',function(e){
+    var d=e.target.closest('[data-del]');if(!d)return;
+    state.ing=state.ing.filter(function(x){return x.id!==+d.dataset.del;});
+    buildIngs();update();
+  });
+  $('add-ing').addEventListener('click',function(){
+    var r=ing('','','g','','kg');state.ing.push(r);buildIngs();update();
+    var el=$('n'+r.id);if(el)el.focus();
+  });
+  $('plist').addEventListener('click',function(e){
+    var b=e.target.closest('[data-add]');if(!b)return;
+    var p=PRESETS[+b.dataset.add];
+    var r=ing(p.n,'',p.u,p.p,p.u);state.ing.push(r);buildIngs();update();
+    var el=$('q'+r.id);if(el)el.focus();
+  });
+  $('reset').addEventListener('click',function(){
+    state=blank();buildStatic();buildIngs();update();
+  });
+
+  buildStatic();buildIngs();update();
+})();
+</script>
+
+</body>
+</html>
